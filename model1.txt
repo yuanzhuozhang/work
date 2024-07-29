@@ -1,0 +1,252 @@
+Sub ExtractInfo()
+    Dim ws As Worksheet ' Input worksheet
+    Dim dbSheet As Worksheet ' Output worksheet
+    Dim sourceRange As Range ' Range containing input data
+    Dim lastRow As Long ' Variable to find the last row in the output worksheet
+    Dim cell As Range ' Variable to loop through each cell in the source range
+    Dim regex As Object ' Regex object for pattern matching
+    Dim match As Object ' Regex match object for capturing data
+
+    ' Define input and output worksheets
+    Set ws = ThisWorkbook.Sheets("Sheet1") ' Change to your input sheet name
+    Set dbSheet = ThisWorkbook.Sheets("Database") ' Change to your output sheet name
+
+    ' Define the range containing the input data (assuming data starts at row 2)
+    Set sourceRange = ws.Range("E2:K100") ' Adjust the range as needed
+
+    ' Create and configure regex object
+    Set regex = CreateObject("VBScript.RegExp")
+    regex.Global = False
+    regex.IgnoreCase = True
+
+    ' Loop through each row in the source range
+    For Each cell In sourceRange.Rows
+        If Application.WorksheetFunction.CountA(cell) > 0 Then ' Check if the row is not empty
+            ' Check if the cell contains formatted table headers
+            If IsTableHeader(cell) Then
+                ' Process the table
+                ProcessTable cell, dbSheet
+            Else
+                ' Process single-line data
+                ProcessSingleLineData cell, dbSheet
+            End If
+        End If
+    Next cell
+
+    ' Optionally clear the input range after processing
+    sourceRange.ClearContents
+End Sub
+
+Function IsTableHeader(cell As Range) As Boolean
+    ' Check if the cell contains table headers
+    Dim headers As Variant
+    headers = Array("Date", "Type", "Ticker", "Amount ($MM)", "Tenor (Months)", "Rate", "CPIB/YCD", "Yield/Dis", "CPIB/PCN")
+
+    Dim i As Integer
+    For i = LBound(headers) To UBound(headers)
+        If InStr(1, cell.Value, headers(i), vbTextCompare) > 0 Then
+            IsTableHeader = True
+            Exit Function
+        End If
+    Next i
+
+    IsTableHeader = False
+End Function
+
+Sub ProcessTable(cell As Range, dbSheet As Worksheet)
+    Dim tblRange As Range
+    Dim lastRow As Long
+    Dim dataRow As Range
+    Dim tableType As String
+
+    ' Determine the range of the table
+    Set tblRange = cell.CurrentRegion
+
+    ' Determine the type of the table based on the header
+    tableType = GetTableType(cell.Value)
+
+    ' Loop through each row in the table (excluding headers)
+    For Each dataRow In tblRange.Rows
+        If dataRow.Row > cell.Row Then
+            ' Extract data from the table row based on the table type
+            ExtractTableData dataRow, dbSheet, tableType
+        End If
+    Next dataRow
+End Sub
+
+Function GetTableType(header As String) As String
+    ' Determine the type of table based on the header
+    If InStr(1, header, "CPIB/YCD", vbTextCompare) > 0 Then
+        GetTableType = "Floating"
+    ElseIf InStr(1, header, "Yield/Dis", vbTextCompare) > 0 Then
+        GetTableType = "Fixed"
+    ElseIf InStr(1, header, "CPIB/PCN", vbTextCompare) > 0 Then
+        GetTableType = "ABCP"
+    Else
+        GetTableType = "Unknown"
+    End If
+End Function
+
+Sub ExtractTableData(dataRow As Range, dbSheet As Worksheet, tableType As String)
+    Dim dateVal As String
+    Dim typeVal As String
+    Dim ticker As String
+    Dim amount As String
+    Dim tenor As String
+    Dim rate As String
+    Dim other As String
+    Dim referenceRateBase As String
+    Dim lastRow As Long
+
+    ' Assign values from table row to variables
+    dateVal = dataRow.Cells(1, 1).Value
+    typeVal = dataRow.Cells(1, 2).Value
+    ticker = dataRow.Cells(1, 3).Value
+    amount = Replace(dataRow.Cells(1, 4).Value, "$", "")
+    tenor = dataRow.Cells(1, 5).Value
+    rate = dataRow.Cells(1, 6).Value
+    Select Case tableType
+        Case "Floating"
+            other = dataRow.Cells(1, 7).Value
+            referenceRateBase = typeVal ' Assuming the type column indicates the reference rate base
+        Case "Fixed"
+            other = dataRow.Cells(1, 7).Value
+            referenceRateBase = "Fixed"
+        Case "ABCP"
+            other = dataRow.Cells(1, 7).Value
+            referenceRateBase = typeVal ' Assuming the type column indicates the reference rate base
+        Case Else
+            other = ""
+            referenceRateBase = ""
+    End Select
+
+    ' Find the last row in the database sheet
+    lastRow = dbSheet.Cells(dbSheet.Rows.Count, "A").End(xlUp).Row + 1
+
+    ' Output the extracted data to the next available row in the database sheet
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Date")).Value = dateVal
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Reference Rate Base")).Value = referenceRateBase
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Ticker")).Value = ticker
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Amount")).Value = amount
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Tenor")).Value = "month"
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Tenor Value")).Value = tenor
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Rate")).Value = rate
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Other")).Value = other
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Date")).Value = Now ' Add the current date
+End Sub
+
+Sub ProcessSingleLineData(cell As Range, dbSheet As Worksheet)
+    Dim regex As Object
+    Dim match As Object
+    Dim issuer As String
+    Dim tenorUnit As String
+    Dim tenorValue As String
+    Dim rate As String
+    Dim spread As String
+    Dim other As String
+    Dim amount As String
+    Dim maturity As String
+    Dim referenceRateBase As String
+    Dim lastRow As Long
+
+    ' Create and configure regex object
+    Set regex = CreateObject("VBScript.RegExp")
+    regex.Global = False
+    regex.IgnoreCase = True
+
+    ' Reset extracted variables
+    issuer = ""
+    tenorUnit = ""
+    tenorValue = ""
+    rate = ""
+    spread = ""
+    other = ""
+    amount = ""
+    maturity = ""
+    referenceRateBase = ""
+
+    ' Apply regex patterns to extract information based on current tenor
+    regex.Pattern = "(\d+\.\d+)\s+(\d+/\d+)\s+(\w+)\s+(\d+)\s*mm"
+    If regex.Test(cell.Value) Then
+        Set match = regex.Execute(cell.Value)(0)
+        rate = match.SubMatches(0)
+        maturity = match.SubMatches(1)
+        issuer = match.SubMatches(2)
+        amount = match.SubMatches(3)
+        tenorUnit = "month"
+        tenorValue = "" ' Assuming missing tenor value for now
+
+    Else
+        regex.Pattern = "S\+(\d+)\s*(\d+/\d+)?\s*(\w+)\s*(\w+)?\s*(\d+)\s*mm"
+        If regex.Test(cell.Value) Then
+            Set match = regex.Execute(cell.Value)(0)
+            spread = match.SubMatches(0)
+            maturity = IIf(IsNull(match.SubMatches(1)), "", match.SubMatches(1))
+            issuer = match.SubMatches(2)
+            other = IIf(IsNull(match.SubMatches(3)), "", match.SubMatches(3))
+            amount = match.SubMatches(4)
+            referenceRateBase = "SOFR"
+            tenorUnit = "month"
+            tenorValue = "" ' Assuming missing tenor value for now
+        Else
+            regex.Pattern = "(\d+/\d+)\s+(\w+)\s+S\+(\d+)\s+(\d+)\s+NIM8"
+            If regex.Test(cell.Value) Then
+                Set match = regex.Execute(cell.Value)(0)
+                maturity = match.SubMatches(0)
+                issuer = match.SubMatches(1)
+                spread = match.SubMatches(2)
+                amount = match.SubMatches(3)
+                other = "NIM8"
+                referenceRateBase = "SOFR"
+                tenorUnit = "unknown"
+                tenorValue = "" ' Assuming missing tenor value for now
+            Else
+                regex.Pattern = "(\d+)([a-zA-Z]+)\s+(\w+)\s+(\d+\.\d+)"
+                If regex.Test(cell.Value) Then
+                    Set match = regex.Execute(cell.Value)(0)
+                    tenorValue = match.SubMatches(0)
+                    tenorUnit = match.SubMatches(1)
+                    issuer = match.SubMatches(2)
+                    rate = match.SubMatches(3)
+                End If
+            End If
+        End If
+    End If
+
+    ' Find the last row in the database sheet
+    lastRow = dbSheet.Cells(dbSheet.Rows.Count, "A").End(xlUp).Row + 1
+
+    ' Output the extracted data to the next available row in the database sheet
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Ticker")).Value = issuer
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Tenor")).Value = tenorUnit
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Tenor Value")).Value = tenorValue
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Rate")).Value = rate
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Spread")).Value = spread
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Other")).Value = other
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Amount")).Value = amount
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Maturity")).Value = maturity
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Reference Rate Base")).Value = referenceRateBase
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Date")).Value = Now ' Add the current date
+End Sub
+
+Function GetDatabaseColumn(dbSheet As Worksheet, colName As String) As Integer
+    Dim headerRow As Range
+    Dim cell As Range
+    Dim lastCol As Long
+
+    ' Define the header row in the database sheet
+    Set headerRow = dbSheet.Rows(1)
+
+    ' Check if the column already exists in the header row
+    For Each cell In headerRow.Cells
+        If cell.Value = colName Then
+            GetDatabaseColumn = cell.Column
+            Exit Function
+        End If
+    Next cell
+
+    ' If the column does not exist, add it to the next available column
+    lastCol = dbSheet.Cells(1, dbSheet.Columns.Count).End(xlToLeft).Column
+    dbSheet.Cells(1, lastCol + 1).Value = colName
+    GetDatabaseColumn = lastCol + 1
+End Function

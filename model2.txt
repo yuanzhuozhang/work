@@ -1,0 +1,57 @@
+Sub ExtractInfo()
+    Dim ws As Worksheet ' Input worksheet
+    Dim dbSheet As Worksheet ' Output worksheet
+    Dim sourceRange As Range ' Range containing input data
+    Dim lastRow As Long ' Variable to find the last row in the output worksheet
+    Dim cell As Range ' Variable to loop through each cell in the source range
+    Dim regex As Object ' Regex object for pattern matching
+    Dim match As Object ' Regex match object for capturing data
+
+    ' Define input and output worksheets
+    Set ws = ThisWorkbook.Sheets("Sheet1") ' Change to your input sheet name
+    Set dbSheet = ThisWorkbook.Sheets("Database") ' Change to your output sheet name
+
+    ' Define the range containing the input data (assuming data starts at row 2)
+    Set sourceRange = ws.Range("E2:K100") ' Adjust the range as needed
+
+    ' Create and configure regex object
+    Set regex = CreateObject("VBScript.RegExp")
+    regex.Global = False
+    regex.IgnoreCase = True
+
+    ' Loop through each row in the source range
+    For Each cell In sourceRange.Rows
+        If Application.WorksheetFunction.CountA(cell) > 0 Then ' Check if the row is not empty
+            ' Ignore the first row if it contains a header like "FRN trades"
+            If InStr(1, cell.Cells(1, 1).Value, "FRN trades", vbTextCompare) = 0 Then
+                ' Process single-line data
+                ProcessSingleLineData cell, dbSheet
+            End If
+        End If
+    Next cell
+
+    ' Optionally clear the input range after processing
+    sourceRange.ClearContents
+End Sub
+
+Function GetDatabaseColumn(dbSheet As Worksheet, colName As String) As Integer
+    Dim headerRow As Range
+    Dim cell As Range
+    Dim lastCol As Long
+
+    ' Define the header row in the database sheet
+    Set headerRow = dbSheet.Rows(1)
+
+    ' Check if the column already exists in the header row
+    For Each cell In headerRow.Cells
+        If cell.Value = colName Then
+            GetDatabaseColumn = cell.Column
+            Exit Function
+        End If
+    Next cell
+
+    ' If the column does not exist, add it to the next available column
+    lastCol = dbSheet.Cells(1, dbSheet.Columns.Count).End(xlToLeft).Column
+    dbSheet.Cells(1, lastCol + 1).Value = colName
+    GetDatabaseColumn = lastCol + 1
+End Function
