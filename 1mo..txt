@@ -1,0 +1,86 @@
+Function ExtractLineData(cellValue As String) As Dictionary
+    Dim regex As Object
+    Dim match As Object
+    Dim extractedData As Dictionary
+    Set extractedData = New Dictionary
+    
+    ' Create and configure regex object
+    Set regex = CreateObject("VBScript.RegExp")
+    regex.Global = False
+    regex.IgnoreCase = True
+
+    ' Initialize dictionary with default values
+    extractedData.Add "Issuer", ""
+    extractedData.Add "TenorUnit", ""
+    extractedData.Add "TenorValue", ""
+    extractedData.Add "Rate", ""
+    extractedData.Add "Spread", ""
+    extractedData.Add "Other", ""
+    extractedData.Add "Amount", ""
+    extractedData.Add "Maturity", ""
+    extractedData.Add "ReferenceRateBase", ""
+
+    ' Apply regex patterns to extract information
+    regex.Pattern = "(\d+)\s*days"
+    If regex.Test(cellValue) Then
+        ' Extract tenor in days
+        Set match = regex.Execute(cellValue)(0)
+        extractedData("TenorUnit") = "Days"
+        extractedData("TenorValue") = match.SubMatches(0)
+    Else
+        regex.Pattern = "(\d+)\s*mo\."
+        If regex.Test(cellValue) Then
+            ' Extract tenor in months
+            Set match = regex.Execute(cellValue)(0)
+            extractedData("TenorUnit") = "month"
+            extractedData("TenorValue") = match.SubMatches(0)
+        Else
+            regex.Pattern = "(\d+\.\d+)\s+(\d+/\d+)\s+(\w+)\s+(\d+)\s*mm"
+            If regex.Test(cellValue) Then
+                ' Extract rate, maturity, issuer, and amount
+                Set match = regex.Execute(cellValue)(0)
+                extractedData("Rate") = match.SubMatches(0)
+                extractedData("Maturity") = match.SubMatches(1)
+                extractedData("Issuer") = match.SubMatches(2)
+                extractedData("Amount") = match.SubMatches(3)
+            Else
+                regex.Pattern = "S\s*\+\s*(\d+)\s*(\d+/\d+)?\s*(\w+)\s*(\w+)?\s*(\d+)\s*mm"
+                If regex.Test(cellValue) Then
+                    ' Extract spread, maturity, issuer, and amount for SOFR-based entries
+                    Set match = regex.Execute(cellValue)(0)
+                    extractedData("Spread") = match.SubMatches(0)
+                    extractedData("Maturity") = IIf(IsNull(match.SubMatches(1)), "", match.SubMatches(1))
+                    extractedData("Issuer") = match.SubMatches(2)
+                    extractedData("Other") = IIf(IsNull(match.SubMatches(3)), "", match.SubMatches(3))
+                    extractedData("Amount") = match.SubMatches(4)
+                    extractedData("ReferenceRateBase") = "SOFR"
+                End If
+            End If
+        End If
+    End If
+
+    Set ExtractLineData = extractedData
+End Function
+
+Sub ProcessSingleLineData(cell As Range, dbSheet As Worksheet)
+    Dim extractedData As Dictionary
+    Dim lastRow As Long
+
+    ' Extract data using the ExtractLineData function
+    Set extractedData = ExtractLineData(cell.Value)
+
+    ' Find the last row in the database sheet
+    lastRow = dbSheet.Cells(dbSheet.Rows.Count, "A").End(xlUp).Row + 1
+
+    ' Output the extracted data to the next available row in the database sheet
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Ticker")).Value = extractedData("Issuer")
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Tenor")).Value = extractedData("TenorUnit")
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Tenor Value")).Value = extractedData("TenorValue")
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Rate")).Value = extractedData("Rate")
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Spread")).Value = extractedData("Spread")
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Other")).Value = extractedData("Other")
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Amount")).Value = extractedData("Amount")
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Maturity")).Value = extractedData("Maturity")
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Reference Rate Base")).Value = extractedData("ReferenceRateBase")
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Date")).Value = Now ' Add the current date
+End Sub

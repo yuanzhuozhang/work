@@ -1,0 +1,146 @@
+Sub ProcessTable(cell As Range, dbSheet As Worksheet)
+    Dim tblRange As Range
+    Dim lastRow As Long
+    Dim dataRow As Range
+    Dim headerRow As Range
+    Dim rowOffset As Long
+    Dim rateCol As Integer
+    Dim lastCol As Integer
+
+    ' Determine the range of the table
+    Set tblRange = cell.CurrentRegion
+
+    ' Find the first row of actual data by skipping non-data headers
+    rowOffset = 1
+    Do While Not IsTableHeader(tblRange.Cells(rowOffset, 1))
+        rowOffset = rowOffset + 1
+    Loop
+
+    ' Find the column indices for relevant headers
+    Set headerRow = tblRange.Rows(tblRange.Row + rowOffset - 1)
+    rateCol = GetHeaderColumn(headerRow, "Rate")
+    lastCol = headerRow.Cells(headerRow.Cells.Count).End(xlToLeft).Column
+    
+    ' Process each row in the table starting from the first row of actual data
+    For Each dataRow In tblRange.Rows
+        If dataRow.Row >= tblRange.Row + rowOffset Then
+            ' Extract data from the table row
+            ExtractTableData dataRow, dbSheet, rateCol, lastCol
+        End If
+    Next dataRow
+End Sub
+
+Function IsTableHeader(cell As Range) As Boolean
+    Dim headers As Variant
+    Dim i As Integer
+    Dim cellValue As String
+
+    ' Define the headers array
+    headers = Array("Date", "Type", "Ticker", "Amount", "Tenor", "Rate", "CPIB/YCD", "Yield/Dis", "CPIB/PCN")
+
+    ' Convert cell value to string, handling errors and null values
+    On Error Resume Next
+    cellValue = CStr(cell.Value)
+    On Error GoTo 0
+
+    ' If cellValue is empty or an error, exit function
+    If cellValue = "" Or IsError(cell.Value) Then
+        IsTableHeader = False
+        Exit Function
+    End If
+
+    ' Check if the cell value contains any of the headers
+    For i = LBound(headers) To UBound(headers)
+        If InStr(1, cellValue, headers(i), vbTextCompare) > 0 Then
+            IsTableHeader = True
+            Exit Function
+        End If
+    Next i
+
+    IsTableHeader = False
+End Function
+
+Sub ExtractTableData(dataRow As Range, dbSheet As Worksheet, rateCol As Integer, lastCol As Integer)
+    Dim dateVal As String
+    Dim typeVal As String
+    Dim ticker As String
+    Dim amount As String
+    Dim tenor As String
+    Dim tenorValue As String
+    Dim rate As String
+    Dim spread As String
+    Dim other As String
+    Dim lastRow As Long
+
+    ' Assign values from table row to variables
+    dateVal = dataRow.Cells(1, 1).Value
+    typeVal = dataRow.Cells(1, 2).Value
+    ticker = dataRow.Cells(1, 3).Value
+    amount = Replace(dataRow.Cells(1, 4).Value, "$", "")
+    tenor = "month" ' Default to 'month'
+    tenorValue = dataRow.Cells(1, 5).Value
+    rate = dataRow.Cells(1, rateCol).Value
+    other = dataRow.Cells(1, lastCol).Value
+
+    ' Determine if 'Rate' has decimal point
+    If InStr(rate, ".") > 0 Then
+        ' 'Rate' has decimal point
+        ' Put values accordingly
+        spread = ""
+        other = typeVal
+    Else
+        ' 'Rate' is integer
+        ' Put values accordingly
+        spread = rate
+        other = dataRow.Cells(1, lastCol).Value
+    End If
+
+    ' Find the last row in the database sheet
+    lastRow = dbSheet.Cells(dbSheet.Rows.Count, "A").End(xlUp).Row + 1
+
+    ' Output the extracted data to the next available row in the database sheet
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Date")).Value = Now
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Reference Rate Base")).Value = typeVal
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Ticker")).Value = ticker
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Amount")).Value = amount
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Tenor")).Value = tenor
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Tenor Value")).Value = tenorValue
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Rate")).Value = IIf(InStr(rate, ".") > 0, rate, "")
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Spread")).Value = IIf(InStr(rate, ".") = 0, rate, "")
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Other")).Value = other
+End Sub
+
+Function GetHeaderColumn(headerRow As Range, headerName As String) As Integer
+    Dim cell As Range
+
+    For Each cell In headerRow.Cells
+        If cell.Value = headerName Then
+            GetHeaderColumn = cell.Column
+            Exit Function
+        End If
+    Next cell
+
+    GetHeaderColumn = 0 ' Header not found
+End Function
+
+Function GetDatabaseColumn(dbSheet As Worksheet, colName As String) As Integer
+    Dim headerRow As Range
+    Dim cell As Range
+    Dim lastCol As Long
+
+    ' Define the header row in the database sheet
+    Set headerRow = dbSheet.Rows(1)
+
+    ' Check if the column already exists in the header row
+    For Each cell In headerRow.Cells
+        If cell.Value = colName Then
+            GetDatabaseColumn = cell.Column
+            Exit Function
+        End If
+    Next cell
+
+    ' If the column does not exist, add it to the next available column
+    lastCol = dbSheet.Cells(1, dbSheet.Columns.Count).End(xlToLeft).Column
+    dbSheet.Cells(1, lastCol + 1).Value = colName
+    GetDatabaseColumn = lastCol + 1
+End Function
