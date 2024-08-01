@@ -1,0 +1,144 @@
+Sub ProcessFRNTrades(cell As Range, dbSheet As Worksheet)
+    Dim regex As Object
+    Dim match As Object
+    Dim tenorUnit As String
+    Dim tenorValue As String
+    Dim amount As String
+    Dim ticker As String
+    Dim other As String
+    Dim referenceRateBase As String
+    Dim spread As String
+    Dim lastRow As Long
+
+    ' Create and configure regex object
+    Set regex = CreateObject("VBScript.RegExp")
+    regex.Global = False
+    regex.IgnoreCase = True
+
+    ' Reset extracted variables
+    tenorUnit = ""
+    tenorValue = ""
+    amount = ""
+    ticker = ""
+    other = ""
+    referenceRateBase = ""
+    spread = ""
+
+    ' Define regex patterns and corresponding logic
+    Dim patterns As Variant
+    patterns = Array( _
+        Array("(\d+)\s*mo\.\s*([\d.]+)\s*(\S+)\s*(\w+)\s*(\d+)mm", _
+              Function(match) HandlePattern1(match, tenorUnit, tenorValue, amount, ticker, other, referenceRateBase, spread)) _
+        , Array("(\d+)\s*mo\.\s*([\d.]+)\s*(\w+)\s*(\w+)\s*(\d+)mm", _
+                Function(match) HandlePattern2(match, tenorUnit, tenorValue, amount, ticker, other, referenceRateBase, spread)) _
+        , Array("(\d+)\s*Days\s*S\s*\+\s*(\d+)\s*(\d{1,2}/\d{1,2})\s*(\w+)\s*(\d+)mm", _
+                Function(match) HandlePattern3(match, tenorUnit, tenorValue, amount, ticker, other, referenceRateBase, spread)) _
+        , Array("(\d+)\s*mo\.\s*([\d.]+)\s*(\w+)\s*(\d+)mm", _
+                Function(match) HandlePattern4(match, tenorUnit, tenorValue, amount, ticker, other, referenceRateBase, spread)) _
+        , Array("(\d+)\s*mo\.\s*([\d.]+)\s*(\S+)\s*(\d+)mm", _
+                Function(match) HandlePattern5(match, tenorUnit, tenorValue, amount, ticker, other, referenceRateBase, spread)) _
+    )
+
+    ' Loop through patterns and apply each one
+    Dim pattern As Variant
+    For Each pattern In patterns
+        Set regex = CreateObject("VBScript.RegExp")
+        regex.Global = False
+        regex.IgnoreCase = True
+        regex.Pattern = pattern(0)
+        
+        If regex.Test(cell.Value) Then
+            Set match = regex.Execute(cell.Value)(0)
+            pattern(1).Invoke match ' Execute the pattern logic
+            Exit For ' Stop once the pattern matches
+        End If
+    Next pattern
+
+    ' Find the last row in the database sheet
+    lastRow = dbSheet.Cells(dbSheet.Rows.Count, "A").End(xlUp).Row + 1
+
+    ' Output the extracted data to the next available row in the database sheet
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Tenor")).Value = tenorUnit
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Tenor Value")).Value = tenorValue
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Amount")).Value = amount
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Ticker")).Value = ticker
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Other")).Value = other
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Reference Rate Base")).Value = referenceRateBase
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Spread")).Value = spread
+    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Date")).Value = Now ' Add the current date
+End Sub
+
+' Function to handle Pattern 1
+Function HandlePattern1(match As Object, ByRef tenorUnit As String, ByRef tenorValue As String, _
+                        ByRef amount As String, ByRef ticker As String, ByRef other As String, _
+                        ByRef referenceRateBase As String, ByRef spread As String)
+    tenorValue = match.SubMatches(0)
+    tenorUnit = "month"
+    amount = Replace(match.SubMatches(1), ",", "")
+    ticker = match.SubMatches(2)
+    other = match.SubMatches(3)
+    referenceRateBase = match.SubMatches(4)
+    spread = match.SubMatches(5)
+End Function
+
+' Function to handle Pattern 2
+Function HandlePattern2(match As Object, ByRef tenorUnit As String, ByRef tenorValue As String, _
+                        ByRef amount As String, ByRef ticker As String, ByRef other As String, _
+                        ByRef referenceRateBase As String, ByRef spread As String)
+    tenorValue = match.SubMatches(0)
+    tenorUnit = "month"
+    amount = Replace(match.SubMatches(1), ",", "")
+    ticker = match.SubMatches(2)
+    other = match.SubMatches(3)
+    referenceRateBase = ""
+    spread = ""
+End Function
+
+' Function to handle Pattern 3
+Function HandlePattern3(match As Object, ByRef tenorUnit As String, ByRef tenorValue As String, _
+                        ByRef amount As String, ByRef ticker As String, ByRef other As String, _
+                        ByRef referenceRateBase As String, ByRef spread As String)
+    tenorValue = ""
+    tenorUnit = ""
+    amount = Replace(match.SubMatches(1), ",", "")
+    ticker = match.SubMatches(3)
+    other = match.SubMatches(2)
+    referenceRateBase = ""
+    spread = match.SubMatches(4)
+End Function
+
+' Function to handle Pattern 4
+Function HandlePattern4(match As Object, ByRef tenorUnit As String, ByRef tenorValue As String, _
+                        ByRef amount As String, ByRef ticker As String, ByRef other As String, _
+                        ByRef referenceRateBase As String, ByRef spread As String)
+    tenorValue = match.SubMatches(0)
+    tenorUnit = "month"
+    amount = Replace(match.SubMatches(1), ",", "")
+    ticker = match.SubMatches(2)
+    other = ""
+    referenceRateBase = ""
+    spread = ""
+End Function
+
+' Function to handle Pattern 5
+Function HandlePattern5(match As Object, ByRef tenorUnit As String, ByRef tenorValue As String, _
+                        ByRef amount As String, ByRef ticker As String, ByRef other As String, _
+                        ByRef referenceRateBase As String, ByRef spread As String)
+    tenorValue = match.SubMatches(0)
+    tenorUnit = "month"
+    amount = Replace(match.SubMatches(1), ",", "")
+    ticker = match.SubMatches(2)
+    other = ""
+    referenceRateBase = ""
+    spread = ""
+End Function
+
+Function GetDatabaseColumn(ws As Worksheet, columnName As String) As Integer
+    Dim col As Range
+    Set col = ws.Rows(1).Find(What:=columnName, LookIn:=xlValues, LookAt:=xlWhole)
+    If Not col Is Nothing Then
+        GetDatabaseColumn = col.Column
+    Else
+        GetDatabaseColumn = -1
+    End If
+End Function
