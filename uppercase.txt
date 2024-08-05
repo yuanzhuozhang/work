@@ -1,0 +1,18 @@
+Sub ConvertTextToUpperCase()
+    Dim ws As Worksheet
+    Dim cell As Range
+
+    ' Define your target sheet
+    Set ws = ThisWorkbook.Sheets("YourSheetName") ' Change to your sheet name
+
+    ' Loop through each cell in the sheet and convert text to uppercase
+    For Each cell In ws.UsedRange
+        If Not IsEmpty(cell.Value) Then
+            If VarType(cell.Value) = vbString Then
+                cell.Value = UCase(cell.Value)
+            End If
+        End If
+    Next cell
+
+    MsgBox "All text has been converted to uppercase."
+End Sub

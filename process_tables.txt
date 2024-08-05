@@ -1,0 +1,72 @@
+Sub ProcessTables()
+    Dim wsSource As Worksheet
+    Dim wsTarget As Worksheet
+    Dim lastRowSource As Long
+    Dim lastRowTarget As Long
+    Dim i As Long
+    Dim rowData As Range
+    Dim tableType As String
+
+    ' Define your source and target sheets
+    Set wsSource = ThisWorkbook.Sheets("SourceSheetName") ' Change to your source sheet name
+    Set wsTarget = ThisWorkbook.Sheets("TargetSheetName") ' Change to your target sheet name
+
+    ' Find the last rows in both source and target sheets
+    lastRowSource = wsSource.Cells(wsSource.Rows.Count, "A").End(xlUp).Row
+    lastRowTarget = wsTarget.Cells(wsTarget.Rows.Count, "A").End(xlUp).Row + 1
+
+    ' Loop through each row in the source sheet
+    For i = 2 To lastRowSource ' Assuming the first row is headers
+        ' Check for empty row to stop processing
+        If Application.WorksheetFunction.CountA(wsSource.Rows(i)) = 0 Then
+            Exit For
+        End If
+
+        ' Read the data from the source sheet
+        Set rowData = wsSource.Rows(i)
+
+        ' Determine the table type by checking the header row
+        If wsSource.Cells(i, 1).Value = "Floating Rate Notes" Or wsSource.Cells(i, 1).Value = "Fixed" Or wsSource.Cells(i, 1).Value = "ABCP" Then
+            tableType = wsSource.Cells(i, 1).Value
+            i = i + 1 ' Move to the next row which contains the actual data
+            Set rowData = wsSource.Rows(i)
+        End If
+
+        ' Process the data based on the table type
+        Select Case tableType
+            Case "Floating Rate Notes"
+                wsTarget.Cells(lastRowTarget, 1).Value = rowData.Cells(1, 1).Value ' Date
+                wsTarget.Cells(lastRowTarget, 2).Value = rowData.Cells(1, 3).Value ' Ticker
+                wsTarget.Cells(lastRowTarget, 3).Value = rowData.Cells(1, 4).Value ' Amount
+                wsTarget.Cells(lastRowTarget, 4).Value = "month" ' Tenor
+                wsTarget.Cells(lastRowTarget, 5).Value = rowData.Cells(1, 5).Value ' Tenor Value
+                wsTarget.Cells(lastRowTarget, 6).Value = rowData.Cells(1, 6).Value ' Spread
+                wsTarget.Cells(lastRowTarget, 7).Value = rowData.Cells(1, 7).Value ' Other
+                wsTarget.Cells(lastRowTarget, 8).Value = rowData.Cells(1, 2).Value ' Reference Rate Base
+
+            Case "Fixed"
+                wsTarget.Cells(lastRowTarget, 1).Value = rowData.Cells(1, 1).Value ' Date
+                wsTarget.Cells(lastRowTarget, 2).Value = rowData.Cells(1, 3).Value ' Ticker
+                wsTarget.Cells(lastRowTarget, 3).Value = rowData.Cells(1, 4).Value ' Amount
+                wsTarget.Cells(lastRowTarget, 4).Value = "month" ' Tenor
+                wsTarget.Cells(lastRowTarget, 5).Value = rowData.Cells(1, 5).Value ' Tenor Value
+                wsTarget.Cells(lastRowTarget, 6).Value = rowData.Cells(1, 6).Value ' Rate
+                wsTarget.Cells(lastRowTarget, 7).Value = rowData.Cells(1, 2).Value ' Other
+
+            Case "ABCP"
+                wsTarget.Cells(lastRowTarget, 1).Value = rowData.Cells(1, 1).Value ' Date
+                wsTarget.Cells(lastRowTarget, 2).Value = rowData.Cells(1, 3).Value ' Ticker
+                wsTarget.Cells(lastRowTarget, 3).Value = rowData.Cells(1, 4).Value ' Amount
+                wsTarget.Cells(lastRowTarget, 4).Value = "month" ' Tenor
+                wsTarget.Cells(lastRowTarget, 5).Value = rowData.Cells(1, 5).Value ' Tenor Value
+                wsTarget.Cells(lastRowTarget, 6).Value = rowData.Cells(1, 6).Value ' Spread
+                wsTarget.Cells(lastRowTarget, 7).Value = rowData.Cells(1, 7).Value ' Other
+                wsTarget.Cells(lastRowTarget, 8).Value = rowData.Cells(1, 2).Value ' Reference Rate Base
+        End Select
+
+        ' Move to the next row in the target sheet
+        lastRowTarget = lastRowTarget + 1
+    Next i
+
+    MsgBox "Data has been processed and copied to the target sheet."
+End Sub
