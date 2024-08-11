@@ -1,0 +1,53 @@
+Maturity Date = 
+IF(
+    [Tenor] = "month", 
+    EDATE([Date], [Tenor Value]), 
+    IF(
+        [Tenor] = "year", 
+        DATE(YEAR([Date]) + [Tenor Value], MONTH([Date]), DAY([Date])),
+        IF(
+            [Tenor] = "day",
+            [Date] + [Tenor Value],
+            BLANK()  // Default if "Tenor" is not recognized
+        )
+    )
+)
+
+Number of Days = DATEDIFF([Date], [Maturity Date], DAY)
+
+Converted Yield = 
+IF(
+    NOT(ISBLANK([Rate])),
+    IF(
+        SEARCH("CD", [Other], 1, 0) > 0, 
+        [Rate], 
+        IF(
+            SEARCH("CP", [Other], 1, 0) > 0,
+            [Rate] / (1 - [Rate] * [Number of Days] / 360 / 100),
+            BLANK()
+        )
+    ),
+    IF(
+        NOT(ISBLANK([Spread])),
+        VAR TenorKey = 
+            SWITCH(
+                TRUE(),
+                [Tenor] = "month", [Tenor Value] & " month",
+                [Tenor] = "year", [Tenor Value] & " year",
+                [Tenor] = "day", [Tenor Value] & " day",
+                BLANK()
+            )
+        VAR ReferenceRate = 
+            CALCULATE(
+                SWITCH(
+                    TRUE(),
+                    SEARCH("SOFR", [Reference Rate Base], 1, 0) > 0, MAXX(FILTER(RatesTable, RatesTable[Date] = [Date] && RatesTable[Tenor] = TenorKey), RatesTable[SOFR]),
+                    SEARCH("OBFR", [Reference Rate Base], 1, 0) > 0, MAXX(FILTER(RatesTable, RatesTable[Date] = [Date] && RatesTable[Tenor] = TenorKey), RatesTable[OBFR]),
+                    SEARCH("Fed Funds", [Reference Rate Base], 1, 0) > 0, MAXX(FILTER(RatesTable, RatesTable[Date] = [Date] && RatesTable[Tenor] = TenorKey), RatesTable[Fed Funds]),
+                    0
+                )
+            )
+        RETURN ReferenceRate + [Spread] / 10000,
+        BLANK()
+    )
+)
