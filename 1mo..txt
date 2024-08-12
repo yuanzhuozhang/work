@@ -1,86 +1,24 @@
-Function ExtractLineData(cellValue As String) As Dictionary
-    Dim regex As Object
-    Dim match As Object
-    Dim extractedData As Dictionary
-    Set extractedData = New Dictionary
-    
-    ' Create and configure regex object
-    Set regex = CreateObject("VBScript.RegExp")
-    regex.Global = False
-    regex.IgnoreCase = True
+Good [morning/afternoon], everyone. I'm truly honored to present an overview of my experiences during this internship. Over the past few weeks, I've had the opportunity to immerse myself in various aspects of the financial sector, and it's been an incredibly enlightening journey. I began my internship by rotating through different desks, which allowed me to gain a broad perspective on the operations within the Treasury Department.
 
-    ' Initialize dictionary with default values
-    extractedData.Add "Issuer", ""
-    extractedData.Add "TenorUnit", ""
-    extractedData.Add "TenorValue", ""
-    extractedData.Add "Rate", ""
-    extractedData.Add "Spread", ""
-    extractedData.Add "Other", ""
-    extractedData.Add "Amount", ""
-    extractedData.Add "Maturity", ""
-    extractedData.Add "ReferenceRateBase", ""
+One aspect that particularly stood out to me was the role of the Asset and Liability Management Desk (ATD). I quickly realized that ATD functions almost like a bank within the bank itself, playing a pivotal role in ensuring the institution's financial stability and operational efficiency. ATD is not just another desk; it is responsible for some of the most critical activities that keep the bank's core operations running smoothly.
 
-    ' Apply regex patterns to extract information
-    regex.Pattern = "(\d+)\s*days"
-    If regex.Test(cellValue) Then
-        ' Extract tenor in days
-        Set match = regex.Execute(cellValue)(0)
-        extractedData("TenorUnit") = "Days"
-        extractedData("TenorValue") = match.SubMatches(0)
-    Else
-        regex.Pattern = "(\d+)\s*mo\."
-        If regex.Test(cellValue) Then
-            ' Extract tenor in months
-            Set match = regex.Execute(cellValue)(0)
-            extractedData("TenorUnit") = "month"
-            extractedData("TenorValue") = match.SubMatches(0)
-        Else
-            regex.Pattern = "(\d+\.\d+)\s+(\d+/\d+)\s+(\w+)\s+(\d+)\s*mm"
-            If regex.Test(cellValue) Then
-                ' Extract rate, maturity, issuer, and amount
-                Set match = regex.Execute(cellValue)(0)
-                extractedData("Rate") = match.SubMatches(0)
-                extractedData("Maturity") = match.SubMatches(1)
-                extractedData("Issuer") = match.SubMatches(2)
-                extractedData("Amount") = match.SubMatches(3)
-            Else
-                regex.Pattern = "S\s*\+\s*(\d+)\s*(\d+/\d+)?\s*(\w+)\s*(\w+)?\s*(\d+)\s*mm"
-                If regex.Test(cellValue) Then
-                    ' Extract spread, maturity, issuer, and amount for SOFR-based entries
-                    Set match = regex.Execute(cellValue)(0)
-                    extractedData("Spread") = match.SubMatches(0)
-                    extractedData("Maturity") = IIf(IsNull(match.SubMatches(1)), "", match.SubMatches(1))
-                    extractedData("Issuer") = match.SubMatches(2)
-                    extractedData("Other") = IIf(IsNull(match.SubMatches(3)), "", match.SubMatches(3))
-                    extractedData("Amount") = match.SubMatches(4)
-                    extractedData("ReferenceRateBase") = "SOFR"
-                End If
-            End If
-        End If
-    End If
+Firstly, ATD manages the bank's funding requirements, ensuring that the institution has access to the liquidity it needs to meet its obligations. This involves making strategic decisions about short-term borrowing and investing, balancing the bank's liquidity needs with the goal of maximizing returns. The team constantly monitors the market for the best funding opportunities, whether through issuing commercial paper, certificates of deposit, or engaging in repo transactions. They also have to anticipate future cash flow needs and plan accordingly, which requires a deep understanding of both the market and the bank’s own balance sheet.
 
-    Set ExtractLineData = extractedData
-End Function
+In addition to managing funding, ATD is also responsible for overseeing fund transfer pricing (FTP). This is a crucial process that involves setting the internal prices at which different business units within the bank borrow and lend money to each other. FTP is essential for aligning the incentives of different parts of the bank and ensuring that each unit is accountable for its own use of capital. By carefully calibrating these transfer prices, ATD helps to ensure that the bank's various business units are operating efficiently and profitably.
 
-Sub ProcessSingleLineData(cell As Range, dbSheet As Worksheet)
-    Dim extractedData As Dictionary
-    Dim lastRow As Long
+Moreover, ATD plays a significant role in ensuring compliance with regulatory requirements. Given the complex and highly regulated nature of the financial industry, ATD must navigate a myriad of regulatory constraints to maintain the bank’s financial health. This includes adhering to liquidity coverage ratios (LCR), net stable funding ratios (NSFR), and other regulatory metrics that are designed to safeguard the bank against financial distress. The team must stay up to date with evolving regulations and ensure that the bank’s operations are in full compliance. This aspect of ATD's work is not just about following rules; it's about proactively managing risk and ensuring that the bank remains resilient in the face of market volatility or economic downturns.
 
-    ' Extract data using the ExtractLineData function
-    Set extractedData = ExtractLineData(cell.Value)
+The timing of this internship has been particularly interesting because the market has been highly dynamic, with significant movements that I was able to observe firsthand. This exposure allowed me to witness how market events transition from mere news headlines to actual operational impacts within financial institutions. In the past, when asked about something like a rate cut, I could offer general commentary on economic conditions or discuss forward guidance. However, I never really felt the weight of these decisions. That changed about two weeks ago when the Non-Farm Payroll (NFP) numbers came in lower than expected. Our response was to stop posting fixed rates, and at that moment, it struck me—"This is the real deal!" It was a powerful experience that fundamentally changed my perspective on the market.
 
-    ' Find the last row in the database sheet
-    lastRow = dbSheet.Cells(dbSheet.Rows.Count, "A").End(xlUp).Row + 1
+A key takeaway from this internship has been the importance of independent thinking, especially when it comes to understanding the market. Nagai-san, one of my mentors, emphasized this by teaching me a critical lesson: when something happens in the market, it's essential to dig deep, form my own opinions, and not simply echo what the media reports. He would often challenge me with questions like, “How do you think the market will react to Harris taking office?” “When do you expect the next rate cut?” and “What direction do you think USD/JPY is heading?” These questions weren’t just about assessing my current knowledge or gauging how much I had learned; they were deliberately crafted to push me beyond surface-level understanding.
 
-    ' Output the extracted data to the next available row in the database sheet
-    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Ticker")).Value = extractedData("Issuer")
-    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Tenor")).Value = extractedData("TenorUnit")
-    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Tenor Value")).Value = extractedData("TenorValue")
-    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Rate")).Value = extractedData("Rate")
-    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Spread")).Value = extractedData("Spread")
-    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Other")).Value = extractedData("Other")
-    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Amount")).Value = extractedData("Amount")
-    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Maturity")).Value = extractedData("Maturity")
-    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Reference Rate Base")).Value = extractedData("ReferenceRateBase")
-    dbSheet.Cells(lastRow, GetDatabaseColumn(dbSheet, "Date")).Value = Now ' Add the current date
-End Sub
+For instance, when he asked, “How do you think the market will react to Harris taking office?” it wasn’t simply about knowing the immediate market responses or repeating what others had predicted. Instead, it was about developing my ability to anticipate the ripple effects across various sectors, considering factors like investor sentiment, policy changes, and global market interconnections. Similarly, when he queried, “When do you expect the next rate cut?” it wasn’t just about recalling the latest economic indicators or the Federal Reserve’s statements. The real challenge was to interpret these signals within a broader economic context—analyzing historical trends, understanding the interplay between different economic variables, and considering how external factors like geopolitical events or international trade might influence monetary policy decisions. When he asked, “What direction do you think USD/JPY is heading?” the question demanded more than just a prediction based on current exchange rates or market trends. It required me to dig deeper into underlying factors such as interest rate differentials, capital flows, and even the psychological aspects of market participants. This approach forced me to think critically, question assumptions, and synthesize information from multiple sources before arriving at a well-reasoned conclusion.
+
+By engaging with these complex, multi-faceted questions, I was encouraged to move beyond a passive absorption of information and develop a more nuanced, independent perspective. This process not only sharpened my analytical skills but also helped me build confidence in my ability to navigate the complexities of financial markets on my own.
+
+Now, I'd like to talk about the project I worked on during this internship. I was involved in the recap project because we needed a tool that could help clean up, organize, and add more information to the data we collect about Certificates of Deposit (CD) and Commercial Paper (CP) deals. There were a few challenges with this project. First, the data we received came in different formats, which made it hard to process consistently. Also, the raw data often didn't include important details about the issuers, which we needed for a complete analysis. Sometimes, we even had to do extra work to make the data usable.
+
+To tackle these challenges, I decided to use regular expressions, which are a way to search and extract specific information from the data. This allowed us to pull out the key details and put them into a database using Excel macros. Once the data was organized, I used a tool called Power Pivot to link different tables in the database together. This helped us create visualizations and better understand the data. For example, I connected a “Country” table with the main database using a common “ticker” column, which added information about the country of origin for each issuer.
+
+While the project was successful, there are still some areas for improvement. First, the code I wrote works well most of the time, but it might not handle new data patterns. We also need to be careful about duplicate data entries because some issuances are reported more than once, which could lead to counting the same data twice. Finally, we could make the data even better by adding more details, like the credit profiles of issuers or other information from their financial statements.
+
